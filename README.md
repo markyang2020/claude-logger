@@ -20,6 +20,7 @@
 - token 用量汇总
 - 按时间顺序排列的完整对话过程，时间格式为 `yyyy-mm-dd hh:mm:ss`
 - 异常中止状态会在 `summary.md` 中用红色标记
+- Claude Code 自动/手动上下文压缩事件；自动压缩会用橙色高亮，手动压缩会用蓝色高亮
 
 ## 关于 marketplace.json
 

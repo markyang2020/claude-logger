@@ -221,6 +221,22 @@ def record_completion(session_dir: Path, data: dict[str, Any], timestamp: str, e
     append_jsonl(session_dir / "events.jsonl", entry)
 
 
+def record_compact(session_dir: Path, data: dict[str, Any], timestamp: str, event: str) -> None:
+    trigger = str(data.get("trigger") or "unknown")
+    entry: dict[str, Any] = {
+        "event": "compact",
+        "timestamp": timestamp,
+        "phase": "before" if event == "PreCompact" else "after",
+        "hook_event_name": event,
+        "trigger": trigger,
+    }
+    if event == "PreCompact":
+        entry["custom_instructions"] = data.get("custom_instructions") or ""
+    else:
+        entry["compact_summary"] = data.get("compact_summary") or ""
+    append_jsonl(session_dir / "events.jsonl", entry)
+
+
 def load_metadata(session_dir: Path) -> dict[str, Any]:
     path = session_dir / "metadata.json"
     if not path.exists():
@@ -383,6 +399,29 @@ def conversation_timeline(rows: list[dict[str, Any]]) -> list[dict[str, str]]:
     return [{k: str(v) for k, v in item.items() if k != "sort_key"} for item in sorted(timeline, key=lambda item: item["sort_key"])]
 
 
+def compact_label(event: dict[str, Any]) -> str:
+    trigger = str(event.get("trigger") or "unknown")
+    phase = str(event.get("phase") or "unknown")
+    phase_label = "压缩开始" if phase == "before" else "压缩完成"
+    trigger_label = "自动压缩" if trigger == "auto" else "手动压缩" if trigger == "manual" else f"{trigger} 压缩"
+    return f"{trigger_label} · {phase_label}"
+
+
+def compact_html(event: dict[str, Any]) -> str:
+    trigger = str(event.get("trigger") or "unknown")
+    color = "#b45309" if trigger == "auto" else "#1d4ed8" if trigger == "manual" else "#6b7280"
+    background = "#fff7ed" if trigger == "auto" else "#eff6ff" if trigger == "manual" else "#f3f4f6"
+    label = compact_label(event)
+    return f'<span style="color: {color}; background: {background}; font-weight: 700; padding: 2px 6px; border-radius: 4px;">{label}</span>'
+
+
+def compact_events(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return sorted(
+        [event for event in events if event.get("event") == "compact"],
+        key=lambda event: timestamp_sort_key(event.get("timestamp")),
+    )
+
+
 def first_timestamp(events: list[dict[str, Any]]) -> str:
     return str(events[0].get("timestamp") or "N/A") if events else "N/A"
 
@@ -450,6 +489,7 @@ def generate_summary(session_dir: Path) -> None:
     stop_reasons = transcript_stop_reasons(rows)
     usage = transcript_usage(rows)
     timeline = conversation_timeline(rows)
+    compactions = compact_events(events)
 
     start = first_timestamp(events)
     end = last_timestamp(events)
@@ -487,6 +527,24 @@ def generate_summary(session_dir: Path) -> None:
     else:
         lines.append("_未能从 transcript 生成按时间顺序的对话过程。_")
         lines.append("")
+
+    if compactions:
+        lines += ["## 上下文压缩事件", ""]
+        lines.append("这些事件表示 Claude Code 对会话上下文做了压缩。自动压缩通常发生在上下文窗口接近或达到上限时。")
+        lines.append("")
+        for event in compactions:
+            lines.append(f"### {display_time(event.get('timestamp'))} · {compact_html(event)}")
+            lines.append("")
+            if event.get("custom_instructions"):
+                lines.append("**自定义压缩指令：**")
+                lines.append("")
+                lines.append(str(event["custom_instructions"]))
+                lines.append("")
+            if event.get("compact_summary"):
+                lines.append("**压缩摘要：**")
+                lines.append("")
+                lines.append(truncate(event["compact_summary"], 4000))
+                lines.append("")
 
     lines += ["## 用户问题摘要", ""]
     if prompts:
@@ -613,6 +671,8 @@ def main() -> int:
         record_tool(session_dir, data, timestamp, failed=False)
     elif event == "PostToolUseFailure":
         record_tool(session_dir, data, timestamp, failed=True)
+    elif event in ("PreCompact", "PostCompact"):
+        record_compact(session_dir, data, timestamp, event)
     elif event in ("Stop", "StopFailure", "SessionEnd"):
         record_completion(session_dir, data, timestamp, event)
         generate_summary(session_dir)

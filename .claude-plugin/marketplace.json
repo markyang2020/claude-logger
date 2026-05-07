@@ -5,14 +5,14 @@
   },
   "metadata": {
     "description": "Local Claude Code plugins maintained by mark.",
-    "version": "0.1.1"
+    "version": "0.1.2"
   },
   "plugins": [
     {
       "name": "claude-logger",
       "source": "./",
       "description": "Record Claude Code task lifecycle logs to Markdown files under ~/.claude/logs.",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "author": {
         "name": "mark"
       },

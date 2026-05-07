@@ -136,6 +136,8 @@ SessionStart          会话开始
 UserPromptSubmit      用户提交 prompt
 PostToolUse           工具调用成功后
 PostToolUseFailure    工具调用失败后
+PreCompact            Claude Code 压缩上下文前
+PostCompact           Claude Code 压缩上下文后
 Stop                  Claude 正常结束本轮响应
 StopFailure           本轮因为 API/模型错误结束
 SessionEnd            会话结束、清理或退出
@@ -168,6 +170,8 @@ SessionEnd            会话结束、清理或退出
 - `PostToolUseFailure` 有 `tool_name`、`tool_input`、`error`。
 - `Stop` 有 `last_assistant_message`、`stop_hook_active`。
 - `StopFailure` 有 `error`、`error_details`、`last_assistant_message`。
+- `PreCompact` 有 `trigger`、`custom_instructions`。`trigger` 为 `auto` 表示上下文窗口满了触发自动压缩，`manual` 表示用户执行 `/compact`。
+- `PostCompact` 有 `trigger`、`compact_summary`。`compact_summary` 是压缩后生成的会话摘要。
 - `SessionEnd` 有 `reason`。
 
 ## 5. marketplace.json
@@ -635,6 +639,8 @@ SessionStart
 UserPromptSubmit
 PostToolUse
 PostToolUseFailure
+PreCompact
+PostCompact
 Stop
 StopFailure
 SessionEnd
@@ -655,7 +661,7 @@ find ~/.claude/logs -maxdepth 2 -name summary.md -print | tail -20
 open ~/.claude/logs/<session-id>/summary.md
 ```
 
-报告中的 `对话过程` 会按 transcript 时间顺序展示用户、Assistant、工具请求、工具结果。每条记录使用 `yyyy-mm-dd hh:mm:ss` 格式展示时间。异常中止会在报告顶部状态中以红色标记。
+报告中的 `对话过程` 会按 transcript 时间顺序展示用户、Assistant、工具请求、工具结果。每条记录使用 `yyyy-mm-dd hh:mm:ss` 格式展示时间。异常中止会在报告顶部状态中以红色标记。`上下文压缩事件` 会单独列出 `PreCompact` / `PostCompact`，自动压缩用橙色高亮，手动压缩用蓝色高亮。
 
 ### 12.4 排查中途停止
 
@@ -664,6 +670,7 @@ open ~/.claude/logs/<session-id>/summary.md
 ```text
 结束原因判断
 工具调用
+上下文压缩事件
 Transcript stop_reason 统计
 最终输出
 ```
@@ -673,6 +680,7 @@ Transcript stop_reason 统计
 - `normal_completion`：Claude Code 认为任务正常结束。
 - `api_error`：API 或模型调用错误触发 `StopFailure`。
 - `session_ended`：没有正常 Stop 报告，SessionEnd 退出时补生成。
+- `上下文压缩事件` 出现自动压缩：说明 Claude Code 在上下文接近或达到上限时执行了 compact。
 - 工具调用最后一条失败：重点看工具错误、stderr、权限、路径和超时。
 - 没有最终输出：可能是 API 错误、用户中断、进程退出，或 Stop hook 没有机会运行。
 
