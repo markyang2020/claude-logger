@@ -18,6 +18,10 @@ claude-logger/
     README.md
 ```
 
+如果你想了解如何从零开发 Claude Code plugin、有哪些安装方式、如何调试和发布，请看：
+
+[CLAUDE_PLUGIN_DEVELOPMENT.md](CLAUDE_PLUGIN_DEVELOPMENT.md)
+
 ## 记录内容
 
 插件会把日志写到：

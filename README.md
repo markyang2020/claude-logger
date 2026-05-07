@@ -60,6 +60,10 @@ claude plugin validate .
 claude --plugin-dir .
 ```
 
+完整的 Claude Code plugin 开发、安装、调试和发布流程见：
+
+[docs/CLAUDE_PLUGIN_DEVELOPMENT.md](docs/CLAUDE_PLUGIN_DEVELOPMENT.md)
+
 ## 日志文件
 
 每个 session 会生成一个目录：
