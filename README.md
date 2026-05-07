@@ -27,13 +27,7 @@ Claude Code 插件 marketplace 的标准文件位置是：
 .claude-plugin/marketplace.json
 ```
 
-本仓库已经按这个标准提供了 marketplace 文件。为了方便人工查看，仓库根目录也放了一份内容相同的：
-
-```text
-marketplace.json
-```
-
-实际通过 `claude plugin marketplace add markyang2020/claude-logger` 添加 marketplace 时，Claude Code 读取的是 `.claude-plugin/marketplace.json`。
+本仓库只保留这一份标准 marketplace 文件。通过 `claude plugin marketplace add markyang2020/claude-logger` 添加 marketplace 时，Claude Code 读取的就是 `.claude-plugin/marketplace.json`。
 
 ## 安装
 
