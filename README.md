@@ -1,29 +1,94 @@
 # claude-logger
 
-Claude Code plugin that records task lifecycle events to Markdown reports under:
+`claude-logger` 是一个 Claude Code 插件，用 hooks 记录每轮任务的执行过程，并在任务正常结束、API 错误结束或会话退出时生成 Markdown 报告。
+
+日志默认写到：
 
 ```text
 ~/.claude/logs/<session-id>/summary.md
 ```
 
-It captures user prompts, tool calls, tool failures, visible transcript context, final assistant output, and completion reasons from `Stop`, `StopFailure`, and `SessionEnd` hooks.
+## 记录内容
 
-## Install
+- 用户提交的问题
+- Claude Code 调用过的工具、工具入参、耗时和失败信息
+- transcript 中可见的工具请求和工具结果摘要
+- transcript 中可见的 thinking/summary 文本
+- assistant 可见输出和最终输出
+- `Stop`、`StopFailure`、`SessionEnd` 对应的结束原因
+- transcript 里的 `stop_reason` 统计
+- token 用量汇总
+
+## 关于 marketplace.json
+
+Claude Code 插件 marketplace 的标准文件位置是：
+
+```text
+.claude-plugin/marketplace.json
+```
+
+本仓库已经按这个标准提供了 marketplace 文件。为了方便人工查看，仓库根目录也放了一份内容相同的：
+
+```text
+marketplace.json
+```
+
+实际通过 `claude plugin marketplace add markyang2020/claude-logger` 添加 marketplace 时，Claude Code 读取的是 `.claude-plugin/marketplace.json`。
+
+## 安装
 
 ```bash
 claude plugin marketplace add markyang2020/claude-logger
 claude plugin install claude-logger@mark-local-plugins
 ```
 
-For local development:
+安装后重启 Claude Code，然后执行：
+
+```text
+/hooks
+```
+
+确认 `claude-logger` 的 hooks 已加载。
+
+## 本地开发验证
 
 ```bash
+git clone https://github.com/markyang2020/claude-logger.git
+cd claude-logger
+python3 -m py_compile bin/claude_logger.py
 claude plugin validate .
 claude --plugin-dir .
 ```
 
-## Notes
+## 日志文件
 
-Claude Code hooks do not expose hidden chain-of-thought. This plugin records only visible transcript thinking summaries, assistant text, tool calls, and tool results.
+每个 session 会生成一个目录：
 
-Full documentation: [docs/README.md](docs/README.md)
+```text
+~/.claude/logs/<session-id>/
+  summary.md         # Markdown 汇总报告
+  events.jsonl       # 结构化事件
+  hook-inputs.jsonl  # Claude Code 传给 hook 的原始 JSON
+  metadata.json      # session_id、transcript_path、cwd 等元信息
+```
+
+查看最近报告：
+
+```bash
+ls -lt ~/.claude/logs | head
+find ~/.claude/logs -maxdepth 2 -name summary.md -print | tail -20
+```
+
+## 重要限制
+
+Claude Code hooks 不会暴露隐藏 chain-of-thought。因此本插件只能记录 transcript 中可见的 thinking/summary、assistant 输出、工具调用和工具结果。
+
+如果 Claude Code 进程被系统强杀、终端崩溃或机器断电，结束 hook 可能没有机会运行。这种情况下可能没有 `summary.md`，但已经触发过的事件仍会保存在 `events.jsonl` 和 `hook-inputs.jsonl`。
+
+## 卸载
+
+```bash
+claude plugin uninstall claude-logger@mark-local-plugins
+```
+
+历史日志位于 `~/.claude/logs/`，卸载插件不会自动删除这些日志。
