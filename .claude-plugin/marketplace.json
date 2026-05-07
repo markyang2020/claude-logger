@@ -1,0 +1,24 @@
+{
+  "name": "mark-local-plugins",
+  "owner": {
+    "name": "mark"
+  },
+  "metadata": {
+    "description": "Local Claude Code plugins maintained by mark.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "claude-logger",
+      "source": "./",
+      "description": "Record Claude Code task lifecycle logs to Markdown files under ~/.claude/logs.",
+      "version": "0.1.0",
+      "author": {
+        "name": "mark"
+      },
+      "license": "MIT",
+      "category": "observability",
+      "tags": ["hooks", "logging", "debugging", "transcript"]
+    }
+  ]
+}
