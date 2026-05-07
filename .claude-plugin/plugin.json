@@ -1,6 +1,6 @@
 {
   "name": "claude-logger",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Record Claude Code prompts, tool calls, transcript context, final output, and completion reasons to ~/.claude/logs/<session-id>/summary.md.",
   "author": {
     "name": "mark"

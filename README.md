@@ -18,6 +18,8 @@
 - `Stop`、`StopFailure`、`SessionEnd` 对应的结束原因
 - transcript 里的 `stop_reason` 统计
 - token 用量汇总
+- 按时间顺序排列的完整对话过程，时间格式为 `yyyy-mm-dd hh:mm:ss`
+- 异常中止状态会在 `summary.md` 中用红色标记
 
 ## 关于 marketplace.json
 

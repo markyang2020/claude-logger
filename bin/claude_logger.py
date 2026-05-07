@@ -25,6 +25,34 @@ def utc_now() -> str:
     return dt.datetime.now(dt.UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def local_now_display() -> str:
+    return dt.datetime.now().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def display_time(value: Any) -> str:
+    if not value:
+        return "N/A"
+    text = str(value)
+    try:
+        parsed = dt.datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return text[:19].replace("T", " ")
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone()
+    return parsed.replace(tzinfo=None, microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def timestamp_sort_key(value: Any) -> tuple[int, str]:
+    if not value:
+        return (1, "")
+    text = str(value)
+    try:
+        parsed = dt.datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return (1, text)
+    return (0, parsed.astimezone(dt.UTC).isoformat())
+
+
 def safe_name(value: str) -> str:
     value = value or "unknown"
     return re.sub(r"[^A-Za-z0-9._-]+", "-", value)
@@ -220,6 +248,14 @@ def normalize_content_text(content: Any) -> str:
     return ""
 
 
+def content_blocks(content: Any) -> list[dict[str, Any]]:
+    if isinstance(content, str):
+        return [{"type": "text", "text": content}]
+    if isinstance(content, list):
+        return [item for item in content if isinstance(item, dict)]
+    return []
+
+
 def transcript_rows(path_value: Any) -> list[dict[str, Any]]:
     if not path_value:
         return []
@@ -309,6 +345,44 @@ def transcript_usage(rows: list[dict[str, Any]]) -> Counter[str]:
     return totals
 
 
+def conversation_timeline(rows: list[dict[str, Any]]) -> list[dict[str, str]]:
+    timeline: list[dict[str, Any]] = []
+    for index, row in enumerate(rows):
+        row_type = row.get("type")
+        timestamp = display_time(row.get("timestamp"))
+        sort_key = timestamp_sort_key(row.get("timestamp")) + (index,)
+        message = row.get("message")
+        if row_type not in ("user", "assistant") or not isinstance(message, dict):
+            continue
+
+        role = str(message.get("role") or row_type)
+        for block in content_blocks(message.get("content")):
+            block_type = str(block.get("type") or "text")
+            if role == "user" and block_type == "text":
+                text = str(block.get("text") or "")
+                if text:
+                    timeline.append({"sort_key": sort_key, "time": timestamp, "kind": "用户", "text": text})
+            elif role == "user" and block_type == "tool_result":
+                text = str(block.get("content") or "")
+                prefix = f"tool_result `{block.get('tool_use_id') or 'unknown'}`"
+                if block.get("is_error"):
+                    prefix += " ERROR"
+                timeline.append({"sort_key": sort_key, "time": timestamp, "kind": "工具结果", "text": f"{prefix}\n{truncate(text, 1000)}"})
+            elif role == "assistant" and block_type == "text":
+                text = str(block.get("text") or "")
+                if text:
+                    timeline.append({"sort_key": sort_key, "time": timestamp, "kind": "Assistant", "text": text})
+            elif role == "assistant" and block_type == "thinking":
+                thinking = str(block.get("thinking") or "")
+                if thinking:
+                    timeline.append({"sort_key": sort_key, "time": timestamp, "kind": "可见思考摘要", "text": thinking})
+            elif role == "assistant" and block_type == "tool_use":
+                name = block.get("name") or "unknown"
+                tool_input = block.get("input") or {}
+                timeline.append({"sort_key": sort_key, "time": timestamp, "kind": "工具请求", "text": f"{name} {truncate(tool_input, 1000)}"})
+    return [{k: str(v) for k, v in item.items() if k != "sort_key"} for item in sorted(timeline, key=lambda item: item["sort_key"])]
+
+
 def first_timestamp(events: list[dict[str, Any]]) -> str:
     return str(events[0].get("timestamp") or "N/A") if events else "N/A"
 
@@ -346,6 +420,17 @@ def code_inline(value: Any, limit: int = 500) -> str:
     return f"`{text}`"
 
 
+def status_html(completion: dict[str, Any]) -> str:
+    status = str(completion.get("status") or "unknown")
+    kind = str(completion.get("kind") or "unknown")
+    reason = str(completion.get("reason") or "unknown")
+    is_error = status not in ("normal_completion",) or kind in ("stop_failure", "session_end")
+    text = f"{status} / {kind} / {reason}"
+    if is_error:
+        return f'<span style="color: red; font-weight: 700;">异常中止：{text}</span>'
+    return f'<span style="color: green; font-weight: 700;">正常完成：{text}</span>'
+
+
 def generate_summary(session_dir: Path) -> None:
     events = load_jsonl(session_dir / "events.jsonl")
     metadata = load_metadata(session_dir)
@@ -364,6 +449,7 @@ def generate_summary(session_dir: Path) -> None:
     thinking_blocks = assistant_blocks(rows, "thinking")
     stop_reasons = transcript_stop_reasons(rows)
     usage = transcript_usage(rows)
+    timeline = conversation_timeline(rows)
 
     start = first_timestamp(events)
     end = last_timestamp(events)
@@ -375,12 +461,13 @@ def generate_summary(session_dir: Path) -> None:
     lines: list[str] = [
         "# Claude Code 会话日志",
         "",
+        f"- **报告生成时间:** {local_now_display()}",
         f"- **Session ID:** `{session_id}`",
-        f"- **状态:** {completion.get('status') or 'unknown'}",
+        f"- **状态:** {status_html(completion)}",
         f"- **完成类型:** `{completion.get('kind') or 'unknown'}`",
         f"- **完成原因:** {completion.get('reason') or 'unknown'}",
-        f"- **开始时间:** {start}",
-        f"- **结束时间:** {end}",
+        f"- **开始时间:** {display_time(start)}",
+        f"- **结束时间:** {display_time(end)}",
         f"- **耗时:** {duration_text(start, end)}",
     ]
     if metadata.get("cwd"):
@@ -390,8 +477,31 @@ def generate_summary(session_dir: Path) -> None:
     if transcript_path:
         lines.append(f"- **Transcript:** `{transcript_path}`")
 
-    lines += ["", "## 用户问题", ""]
+    lines += ["", "## 对话过程", ""]
+    if timeline:
+        for item in timeline:
+            lines.append(f"### {item['time']} · {item['kind']}")
+            lines.append("")
+            lines.append(item["text"])
+            lines.append("")
+    else:
+        lines.append("_未能从 transcript 生成按时间顺序的对话过程。_")
+        lines.append("")
+
+    lines += ["## 用户问题摘要", ""]
     if prompts:
+        prompt_events = [e for e in events if e.get("event") == "user_prompt" and e.get("prompt")]
+        if prompt_events:
+            for event in prompt_events:
+                lines.append(f"### {display_time(event.get('timestamp'))}")
+                lines.append("")
+                lines.append(md_quote(str(event.get("prompt") or "")))
+                lines.append("")
+        else:
+            for prompt in prompts:
+                lines.append(md_quote(prompt))
+                lines.append("")
+    elif prompts:
         for prompt in prompts:
             lines.append(md_quote(prompt))
             lines.append("")

@@ -655,6 +655,8 @@ find ~/.claude/logs -maxdepth 2 -name summary.md -print | tail -20
 open ~/.claude/logs/<session-id>/summary.md
 ```
 
+报告中的 `对话过程` 会按 transcript 时间顺序展示用户、Assistant、工具请求、工具结果。每条记录使用 `yyyy-mm-dd hh:mm:ss` 格式展示时间。异常中止会在报告顶部状态中以红色标记。
+
 ### 12.4 排查中途停止
 
 优先看报告中的：
